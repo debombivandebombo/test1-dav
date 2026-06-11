@@ -4,4 +4,16 @@ version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "matplotlib>=3.10.9",
+    "mcg-lab-triaxial-positioner-control",
+    "mcg-lab-vna-control",
+    "numpy>=2.4.6",
+    "plotly>=6.8.0",
+    "scienceplots>=2.2.1",
+    "scipy>=1.17.1",
+]
+
+[tool.uv.sources]
+mcg-lab-vna-control = { path = "../mcg-lab-vna-control", editable = true }
+mcg-lab-triaxial-positioner-control = { path = "../mcg-lab-triaxial-positioner-control", editable = true }
