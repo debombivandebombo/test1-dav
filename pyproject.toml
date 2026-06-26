@@ -16,5 +16,5 @@ dependencies = [
 ]
 
 [tool.uv.sources]
-mcg-lab-vna-control = { path = "../mcg-lab-vna-control", editable = true }
 mcg-lab-triaxial-positioner-control = { path = "../mcg-lab-triaxial-positioner-control", editable = true }
+mcg-lab-vna-control = { path = "../mcg-lab-vna-control", editable = true }

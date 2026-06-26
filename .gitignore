@@ -1,0 +1,34 @@
+# ==========================================
+# Carpetas solicitadas (Exclusiones específicas)
+# ==========================================
+.venv/
+data/
+
+# ==========================================
+# Archivos y caché de Python
+# ==========================================
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+ENV/
+
+# ==========================================
+# Configuraciones de editores e IDEs
+# ==========================================
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+
+# ==========================================
+# Archivos del sistema operativo
+# ==========================================
+.DS_Store
+Thumbs.db
