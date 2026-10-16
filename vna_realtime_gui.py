@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QLabel, QDoubleSpinBox, QGroupBox, QStatusBar, QMessageBox
 )
-from PyQt6.QtCore import QThread, pyqtSignal, Qt
+from PyQt6.QtCore import QThread, pyqtSignal
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
@@ -71,9 +71,8 @@ class VNAWorker(QThread):
                 sparams = self.vna.measure_multiple_traces_sparams(trace_list=TRACE_LIST)
                 ts = datetime.now().strftime('%H:%M:%S.%f')[:-3]
                 self.data_ready.emit(freqs_ghz, sparams, ts)
-                time.sleep(0.02)  # Pequeña pausa para ceder tiempo a la UI
+                time.sleep(0.02)
 
-            # Dejar el VNA en modo continuo al cerrar
             self.vna.run_cont()
 
         except Exception as e:
@@ -88,7 +87,7 @@ class VNARealtimeWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Monitor en Tiempo Real VNA (15 - 30 GHz) | Downlink & Uplink")
-        self.resize(1150, 750)
+        self.resize(1200, 820)
 
         os.makedirs(FOLDER_NAME, exist_ok=True)
 
@@ -114,38 +113,90 @@ class VNARealtimeWindow(QMainWindow):
         self.setCentralWidget(central_widget)
         main_layout = QVBoxLayout(central_widget)
 
-        # --- Panel Superior de Controles ---
-        control_group = QGroupBox("Control de Grabación Bajo Demanda")
-        control_layout = QHBoxLayout(control_group)
+        # --- Fila Superior: Controles de Grabación y Escala Y ---
+        top_controls_layout = QHBoxLayout()
 
-        lbl_duration = QLabel("Tiempo de grabación (s):")
-        lbl_duration.setStyleSheet("font-weight: bold; font-size: 13px;")
+        # 1. Grupo de Grabación Bajo Demanda
+        record_group = QGroupBox("Control de Grabación Bajo Demanda")
+        record_layout = QHBoxLayout(record_group)
+
+        lbl_duration = QLabel("Tiempo (s):")
+        lbl_duration.setStyleSheet("font-weight: bold;")
 
         self.spin_duration = QDoubleSpinBox()
         self.spin_duration.setRange(0.5, 3600.0)
         self.spin_duration.setValue(10.0)
         self.spin_duration.setSingleStep(1.0)
         self.spin_duration.setSuffix(" s")
-        self.spin_duration.setMinimumWidth(100)
-        self.spin_duration.setStyleSheet("font-size: 13px; padding: 4px;")
+        self.spin_duration.setMinimumWidth(85)
 
         self.btn_record = QPushButton("🔴 Iniciar Grabación y Guardar")
-        self.btn_record.setMinimumHeight(38)
+        self.btn_record.setMinimumHeight(34)
         self.btn_record.setStyleSheet(
-            "font-weight: bold; font-size: 13px; background-color: #d9534f; color: white; border-radius: 5px; padding: 6px 15px;"
+            "font-weight: bold; background-color: #d9534f; color: white; border-radius: 5px; padding: 4px 12px;"
         )
         self.btn_record.clicked.connect(self.start_recording)
 
-        self.lbl_rec_status = QLabel("Estado: Monitorizando (No grabando)")
-        self.lbl_rec_status.setStyleSheet("font-size: 13px; color: #555555; margin-left: 15px;")
+        self.lbl_rec_status = QLabel("Estado: Monitorizando")
+        self.lbl_rec_status.setStyleSheet("color: #555555; margin-left: 8px;")
 
-        control_layout.addWidget(lbl_duration)
-        control_layout.addWidget(self.spin_duration)
-        control_layout.addWidget(self.btn_record)
-        control_layout.addWidget(self.lbl_rec_status)
-        control_layout.addStretch()
+        record_layout.addWidget(lbl_duration)
+        record_layout.addWidget(self.spin_duration)
+        record_layout.addWidget(self.btn_record)
+        record_layout.addWidget(self.lbl_rec_status)
 
-        main_layout.addWidget(control_group)
+        # 2. Grupo de Escala Eje Y - DOWNLINK
+        dl_scale_group = QGroupBox("Eje Y Downlink (dB)")
+        dl_scale_layout = QHBoxLayout(dl_scale_group)
+
+        self.spin_dl_ymin = QDoubleSpinBox()
+        self.spin_dl_ymin.setRange(-200.0, 50.0)
+        self.spin_dl_ymin.setValue(-90.0)
+        self.spin_dl_ymin.setSingleStep(5.0)
+        self.spin_dl_ymin.setSuffix(" dB")
+        self.spin_dl_ymin.valueChanged.connect(self.update_y_limits)
+
+        self.spin_dl_ymax = QDoubleSpinBox()
+        self.spin_dl_ymax.setRange(-200.0, 50.0)
+        self.spin_dl_ymax.setValue(0.0)
+        self.spin_dl_ymax.setSingleStep(5.0)
+        self.spin_dl_ymax.setSuffix(" dB")
+        self.spin_dl_ymax.valueChanged.connect(self.update_y_limits)
+
+        dl_scale_layout.addWidget(QLabel("Mín:"))
+        dl_scale_layout.addWidget(self.spin_dl_ymin)
+        dl_scale_layout.addWidget(QLabel("Máx:"))
+        dl_scale_layout.addWidget(self.spin_dl_ymax)
+
+        # 3. Grupo de Escala Eje Y - UPLINK
+        ul_scale_group = QGroupBox("Eje Y Uplink (dB)")
+        ul_scale_layout = QHBoxLayout(ul_scale_group)
+
+        self.spin_ul_ymin = QDoubleSpinBox()
+        self.spin_ul_ymin.setRange(-200.0, 50.0)
+        self.spin_ul_ymin.setValue(-90.0)
+        self.spin_ul_ymin.setSingleStep(5.0)
+        self.spin_ul_ymin.setSuffix(" dB")
+        self.spin_ul_ymin.valueChanged.connect(self.update_y_limits)
+
+        self.spin_ul_ymax = QDoubleSpinBox()
+        self.spin_ul_ymax.setRange(-200.0, 50.0)
+        self.spin_ul_ymax.setValue(0.0)
+        self.spin_ul_ymax.setSingleStep(5.0)
+        self.spin_ul_ymax.setSuffix(" dB")
+        self.spin_ul_ymax.valueChanged.connect(self.update_y_limits)
+
+        ul_scale_layout.addWidget(QLabel("Mín:"))
+        ul_scale_layout.addWidget(self.spin_ul_ymin)
+        ul_scale_layout.addWidget(QLabel("Máx:"))
+        ul_scale_layout.addWidget(self.spin_ul_ymax)
+
+        # Añadir los 3 grupos al panel superior
+        top_controls_layout.addWidget(record_group, stretch=2)
+        top_controls_layout.addWidget(dl_scale_group, stretch=1)
+        top_controls_layout.addWidget(ul_scale_group, stretch=1)
+
+        main_layout.addLayout(top_controls_layout)
 
         # --- Lienzo de Gráficas (Matplotlib) ---
         self.fig = Figure(figsize=(10, 7), tight_layout=True)
@@ -157,7 +208,7 @@ class VNARealtimeWindow(QMainWindow):
         self.ax_dl.set_title("Downlink: Transmisión Puerto 1 ➔ Puertos 2, 3, 4 (S21, S31, S41)")
         self.ax_dl.set_ylabel("Magnitud (dB)")
         self.ax_dl.set_xlim(F_START / 1e9, F_STOP / 1e9)
-        self.ax_dl.set_ylim(-90, 0)
+        self.ax_dl.set_ylim(self.spin_dl_ymin.value(), self.spin_dl_ymax.value())
         self.ax_dl.grid(True, linestyle='--', alpha=0.6)
 
         # Subplot 2: Uplink (S12, S13, S14)
@@ -166,10 +217,10 @@ class VNARealtimeWindow(QMainWindow):
         self.ax_ul.set_xlabel("Frecuencia (GHz)")
         self.ax_ul.set_ylabel("Magnitud (dB)")
         self.ax_ul.set_xlim(F_START / 1e9, F_STOP / 1e9)
-        self.ax_ul.set_ylim(-90, 0)
+        self.ax_ul.set_ylim(self.spin_ul_ymin.value(), self.spin_ul_ymax.value())
         self.ax_ul.grid(True, linestyle='--', alpha=0.6)
 
-        # Inicializar las 6 líneas vacías para actualizar rápido
+        # Inicializar las 6 líneas
         colors_dl = ['#1f77b4', '#ff7f0e', '#2ca02c']
         colors_ul = ['#d62728', '#9467bd', '#8c564b']
         self.lines = []
@@ -185,6 +236,20 @@ class VNARealtimeWindow(QMainWindow):
         self.ax_ul.legend(loc="upper right")
 
         self.setStatusBar(QStatusBar())
+
+    def update_y_limits(self):
+        """Actualiza los límites del eje Y de Downlink y Uplink al modificar las casillas."""
+        dl_min = self.spin_dl_ymin.value()
+        dl_max = self.spin_dl_ymax.value()
+        if dl_min < dl_max:
+            self.ax_dl.set_ylim(dl_min, dl_max)
+
+        ul_min = self.spin_ul_ymin.value()
+        ul_max = self.spin_ul_ymax.value()
+        if ul_min < ul_max:
+            self.ax_ul.set_ylim(ul_min, ul_max)
+
+        self.canvas.draw_idle()
 
     def start_recording(self):
         """Activa el almacenamiento de medidas durante el tiempo elegido."""
@@ -206,14 +271,12 @@ class VNARealtimeWindow(QMainWindow):
         if self.current_freqs_hz is None:
             self.current_freqs_hz = freqs_ghz * 1e9
 
-        # Convertir a dB y actualizar las 6 curvas
         mag_db = 20 * np.log10(np.abs(sparams) + 1e-12)
         for i in range(6):
             self.lines[i].set_data(freqs_ghz, mag_db[i, :])
 
         self.canvas.draw_idle()
 
-        # Lógica de grabación temporal bajo demanda
         if self.is_recording:
             elapsed = time.time() - self.record_start_time
             remaining = max(0.0, self.record_duration - elapsed)
@@ -222,9 +285,9 @@ class VNARealtimeWindow(QMainWindow):
             self.recorded_timestamps.append(ts)
 
             self.lbl_rec_status.setText(
-                f"🔴 GRABANDO... Restan {remaining:.1f} s | Barridos capturados: {len(self.recorded_sparams)}"
+                f"🔴 GRABANDO ({remaining:.1f}s) | Barridos: {len(self.recorded_sparams)}"
             )
-            self.lbl_rec_status.setStyleSheet("font-weight: bold; font-size: 13px; color: #d9534f; margin-left: 15px;")
+            self.lbl_rec_status.setStyleSheet("font-weight: bold; color: #d9534f; margin-left: 8px;")
 
             if elapsed >= self.record_duration:
                 self.finish_and_save_recording()
@@ -233,7 +296,6 @@ class VNARealtimeWindow(QMainWindow):
         """Detiene la grabación y vuelca las medidas a un archivo .npz."""
         self.is_recording = False
 
-        # Matriz final con forma: [num_barridos_en_tiempo, 6_trazas, 3001_puntos]
         sparams_array = np.array(self.recorded_sparams, dtype=np.complex64)
         file_ts = datetime.now().strftime('%Y%m%d_%H%M%S')
         filename = f"{FOLDER_NAME}/ul_dl_capture_{file_ts}.npz"
@@ -260,13 +322,13 @@ class VNARealtimeWindow(QMainWindow):
         self.btn_record.setEnabled(True)
         self.spin_duration.setEnabled(True)
         self.btn_record.setText("🔴 Iniciar Grabación y Guardar")
-        self.lbl_rec_status.setText(f"✅ Guardado: {filename} ({len(self.recorded_sparams)} barridos)")
-        self.lbl_rec_status.setStyleSheet("font-weight: bold; font-size: 13px; color: #2ca02c; margin-left: 15px;")
+        self.lbl_rec_status.setText(f"✅ Guardado ({len(self.recorded_sparams)} barridos)")
+        self.lbl_rec_status.setStyleSheet("font-weight: bold; color: #2ca02c; margin-left: 8px;")
         self.statusBar().showMessage(f"Archivo guardado exitosamente en {filename}")
 
     def handle_error(self, err_msg: str):
         QMessageBox.critical(self, "Error en el VNA", f"Se produjo un error de comunicación:\n{err_msg}")
-        self.lbl_rec_status.setText("❌ Error de conexión con el VNA")
+        self.lbl_rec_status.setText("❌ Error de conexión")
 
     def closeEvent(self, event):
         """Cierra de forma segura el hilo del VNA al salir de la aplicación."""
