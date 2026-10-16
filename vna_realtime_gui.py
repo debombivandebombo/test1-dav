@@ -44,7 +44,7 @@ class VNAWorker(QThread):
         try:
             self.status_msg.emit("Conectando al VNA Keysight...")
             self.vna = connect_vna(brand='keysight')
-            self.vna.preset()
+            self.vna.pseudo_preset()        
 
             self.status_msg.emit("Configurando parámetros S (Downlink y Uplink, 15-30 GHz)...")
             self.vna.configure_multiple_sparams(
