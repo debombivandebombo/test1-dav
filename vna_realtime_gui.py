@@ -513,9 +513,6 @@ class VNARealtimeWindow(QMainWindow):
         self.btn_ris_off.setToolTip("Envía el comando OFF (disconnect) a ris_hardware_server.py")
         self.btn_ris_off.clicked.connect(self.turn_off_ris)
 
-        self.lbl_ris_status = QLabel("RIS: Listo")
-        self.lbl_ris_status.setStyleSheet("color: #333333; font-weight: bold; margin-left: 4px;")
-
         lbl_rx = QLabel("RX [X, Y, Z]:")
         lbl_rx.setStyleSheet("font-weight: bold;")
         ris_layout.addWidget(lbl_rx)
@@ -538,7 +535,6 @@ class VNARealtimeWindow(QMainWindow):
         ris_layout.addWidget(self.btn_ris_one)
         ris_layout.addWidget(self.btn_ris_on)
         ris_layout.addWidget(self.btn_ris_off)
-        ris_layout.addWidget(self.lbl_ris_status)
 
         main_layout.addWidget(ris_group)
 
@@ -834,17 +830,13 @@ class VNARealtimeWindow(QMainWindow):
 
             self.last_ris_info = info
             msg = (
-                f"✅ RX=({rx_pos[0]:+.2f}, {rx_pos[1]:.2f}, {rx_pos[2]:+.2f}) m | "
+                f"RX=({rx_pos[0]:+.2f}, {rx_pos[1]:.2f}, {rx_pos[2]:+.2f}) m | "
                 f"Prx est: {info['p_rx_dbm']:.1f} dBm | {info['latencia_ms']:.1f} ms"
             )
-            self.lbl_ris_status.setText(msg)
-            self.lbl_ris_status.setStyleSheet("color: #2ca02c; font-weight: bold; margin-left: 4px;")
             self.statusBar().showMessage(
                 f"RISConfig aplicado mediante RISServerController en {ip}:{port} -> {msg}"
             )
         except Exception as e:
-            self.lbl_ris_status.setText(f"❌ Error RIS: {e}")
-            self.lbl_ris_status.setStyleSheet("color: #d9534f; font-weight: bold; margin-left: 4px;")
             self.statusBar().showMessage(f"Error al enviar configuración a la RIS: {e}")
 
     def apply_uniform_ris(self, state_bit: int):
@@ -868,12 +860,9 @@ class VNARealtimeWindow(QMainWindow):
                 "estados_40x40": mat_40x40,
                 "ris_config": config,
             }
-            self.lbl_ris_status.setText(f"✅ RIS: Todo {bit} enviado")
-            self.lbl_ris_status.setStyleSheet("color: #0275d8; font-weight: bold; margin-left: 4px;")
             self.statusBar().showMessage(f"RISConfig uniforme ({bit}) aplicado con RISServerController en {ip}:{port}.")
         except Exception as e:
-            self.lbl_ris_status.setText(f"❌ Error RIS: {e}")
-            self.lbl_ris_status.setStyleSheet("color: #d9534f; font-weight: bold; margin-left: 4px;")
+            self.statusBar().showMessage(f"Error al enviar configuración uniforme a la RIS: {e}")
 
     def turn_on_ris(self):
         ip = RIS_IP
@@ -882,11 +871,9 @@ class VNARealtimeWindow(QMainWindow):
             self.ris_server.addr = (ip, port)
             self.ris_server.connect()
             self.ris_connected = True
-            self.lbl_ris_status.setText("🟢 RIS: Encendida (ON)")
-            self.lbl_ris_status.setStyleSheet("color: #2ca02c; font-weight: bold; margin-left: 4px;")
             self.statusBar().showMessage(f"controller.connect() (ON) enviado al servidor de la RIS ({ip}:{port}).")
         except Exception as e:
-            self.lbl_ris_status.setText(f"❌ Error RIS: {e}")
+            self.statusBar().showMessage(f"Error al encender la RIS: {e}")
 
     def turn_off_ris(self):
         ip = RIS_IP
@@ -895,11 +882,9 @@ class VNARealtimeWindow(QMainWindow):
             self.ris_server.addr = (ip, port)
             self.ris_server.disconnect()
             self.ris_connected = False
-            self.lbl_ris_status.setText("⏹ RIS: Apagada (OFF)")
-            self.lbl_ris_status.setStyleSheet("color: #555555; font-weight: bold; margin-left: 4px;")
             self.statusBar().showMessage(f"controller.disconnect() (OFF) enviado al servidor de la RIS ({ip}:{port}).")
         except Exception as e:
-            self.lbl_ris_status.setText(f"❌ Error RIS: {e}")
+            self.statusBar().showMessage(f"Error al apagar la RIS: {e}")
 
     # =========================================================================
     # ADQUISICIÓN Y GRABACIÓN DE MEDIDAS DEL VNA
