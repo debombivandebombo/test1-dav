@@ -38,6 +38,10 @@ POINTS = 3001             # Puntos de frecuencia
 IFBW = 10e3               # 10 kHz
 POW_DBM_LIST = [-15, 0, 0, 0]  # Potencia en puertos [1, 2, 3, 4] en dBm
 C_LIGHT = 299792458.0     # Velocidad de la luz (m/s)
+
+# ================= PARÁMETROS RIS =====================
+RIS_IP = "192.168.100.3"
+RIS_PORT = 17000
 # ======================================================
 
 
@@ -216,13 +220,15 @@ class VNARealtimeWindow(QMainWindow):
         self._updating_x_controls = False
 
         # Controlador del servidor de la RIS (RISServerController + RISConfig) y calculador de coordenadas
-        self.ris_server = RISServerController(ip="127.0.0.1", port=17000)
+        self.ris_server = RISServerController(ip=RIS_IP, port=RIS_PORT)
         self.ris_connected = False
         self.ris_controller = RISCoordinateController(
-            server_ip="127.0.0.1",
-            server_port=17000,
+            server_ip=RIS_IP,
+            server_port=RIS_PORT,
             freq_hz=28.0e9,
             tx_pos=(0.0, 1.1, 0.0),
+            boresight="y",
+            polarization_mode="vh",
         )
         self.last_ris_info = None
 
@@ -413,11 +419,9 @@ class VNARealtimeWindow(QMainWindow):
         main_layout.addLayout(axes_controls_layout)
 
         # =====================================================================
-        # FILA 3: CONTROL DE LA RIS POR COORDENADAS 3D (UDP -> ris_hardware_server.py)
-        # =====================================================================
         # PANEL 3: CONTROL DE LA RIS POR COORDENADAS 3D (UDP -> ris_hardware_server.py)
         # =====================================================================
-        ris_group = QGroupBox("Control de Configuración RIS por Coordenadas 3D (RISConfig ➔ ris_hardware_server.py UDP)")
+        ris_group = QGroupBox("Control RIS por Coordenadas 3D (192.168.100.3:17000)")
         ris_layout = QHBoxLayout(ris_group)
 
         # Coordenadas RX [x, y, z]
@@ -452,6 +456,7 @@ class VNARealtimeWindow(QMainWindow):
         self.spin_tx_x.setSingleStep(0.1)
         self.spin_tx_x.setValue(0.00)
         self.spin_tx_x.setSuffix(" m")
+        self.spin_tx_x.valueChanged.connect(self._on_ris_coord_spin_changed)
 
         self.spin_tx_y = QDoubleSpinBox()
         self.spin_tx_y.setDecimals(2)
@@ -459,6 +464,7 @@ class VNARealtimeWindow(QMainWindow):
         self.spin_tx_y.setSingleStep(0.1)
         self.spin_tx_y.setValue(1.10)
         self.spin_tx_y.setSuffix(" m")
+        self.spin_tx_y.valueChanged.connect(self._on_ris_coord_spin_changed)
 
         self.spin_tx_z = QDoubleSpinBox()
         self.spin_tx_z.setDecimals(2)
@@ -466,6 +472,7 @@ class VNARealtimeWindow(QMainWindow):
         self.spin_tx_z.setSingleStep(0.1)
         self.spin_tx_z.setValue(0.00)
         self.spin_tx_z.setSuffix(" m")
+        self.spin_tx_z.valueChanged.connect(self._on_ris_coord_spin_changed)
 
         self.spin_ris_freq = QDoubleSpinBox()
         self.spin_ris_freq.setDecimals(2)
@@ -473,15 +480,7 @@ class VNARealtimeWindow(QMainWindow):
         self.spin_ris_freq.setValue(28.00)
         self.spin_ris_freq.setSingleStep(0.5)
         self.spin_ris_freq.setSuffix(" GHz")
-
-        # Selector de Boresight (plano de la RIS), Optimizador y Polarización
-        self.combo_boresight = QComboBox()
-        self.combo_boresight.addItem("Boresight: Auto", "auto")
-        self.combo_boresight.addItem("Boresight: +X (YZ)", "x")
-        self.combo_boresight.addItem("Boresight: +Y (XZ)", "y")
-        self.combo_boresight.addItem("Boresight: +Z (XY)", "z")
-        self.combo_boresight.setToolTip("Eje normal perpendicular a la placa RIS (según ris.py en surpRISe)")
-        self.combo_boresight.currentIndexChanged.connect(self._on_ris_coord_spin_changed)
+        self.spin_ris_freq.valueChanged.connect(self._on_ris_coord_spin_changed)
 
         self.combo_ris_opt = QComboBox()
         self.combo_ris_opt.addItem("Opt: 1D Search", "1d_search")
@@ -491,32 +490,12 @@ class VNARealtimeWindow(QMainWindow):
         self.combo_ris_opt.setToolTip("Algoritmo de optimización discreta de surpRISe")
         self.combo_ris_opt.currentIndexChanged.connect(self._on_ris_coord_spin_changed)
 
-        self.combo_ris_pol = QComboBox()
-        self.combo_ris_pol.addItem("Pol: V+H", "vh")
-        self.combo_ris_pol.addItem("Pol: Solo V", "v_only")
-        self.combo_ris_pol.addItem("Pol: Solo H", "h_only")
-        self.combo_ris_pol.setToolTip("Configuración de state_matrix_v y state_matrix_h en RISConfig")
-        self.combo_ris_pol.currentIndexChanged.connect(self._on_ris_coord_spin_changed)
-
-        # IP y Puerto del servidor UDP de la RIS
-        self.edit_ris_ip = QLineEdit("127.0.0.1")
-        self.edit_ris_ip.setMaximumWidth(95)
-        self.edit_ris_ip.setToolTip("IP donde corre ris_hardware_server.py")
-
-        self.spin_ris_port = QSpinBox()
-        self.spin_ris_port.setRange(1, 65535)
-        self.spin_ris_port.setValue(17000)
-        self.spin_ris_port.setMaximumWidth(75)
-
         self.btn_apply_ris = QPushButton("📡 Apuntar RIS")
-        self.btn_apply_ris.setMinimumHeight(32)
+        self.btn_apply_ris.setMinimumHeight(30)
         self.btn_apply_ris.setStyleSheet(
-            "font-weight: bold; background-color: #5cb85c; color: white; border-radius: 5px; padding: 4px 10px;"
+            "font-weight: bold; background-color: #5cb85c; color: white; border-radius: 4px; padding: 3px 8px;"
         )
         self.btn_apply_ris.clicked.connect(self.apply_ris_from_ui)
-
-        self.chk_auto_ris = QCheckBox("Auto")
-        self.chk_auto_ris.setToolTip("Actualiza la RIS automáticamente al modificar las coordenadas RX X/Y/Z")
 
         self.btn_ris_zero = QPushButton("Todo 0")
         self.btn_ris_zero.setToolTip("Pone state_matrix_v y state_matrix_h de la RIS en estado 0")
@@ -534,7 +513,7 @@ class VNARealtimeWindow(QMainWindow):
         self.btn_ris_off.setToolTip("Envía el comando OFF (disconnect) a ris_hardware_server.py")
         self.btn_ris_off.clicked.connect(self.turn_off_ris)
 
-        self.lbl_ris_status = QLabel("RIS: Sin enviar")
+        self.lbl_ris_status = QLabel("RIS: Listo")
         self.lbl_ris_status.setStyleSheet("color: #333333; font-weight: bold; margin-left: 4px;")
 
         lbl_rx = QLabel("RX [X, Y, Z]:")
@@ -553,14 +532,8 @@ class VNARealtimeWindow(QMainWindow):
 
         ris_layout.addWidget(QLabel("Freq:"))
         ris_layout.addWidget(self.spin_ris_freq)
-        ris_layout.addWidget(self.combo_boresight)
         ris_layout.addWidget(self.combo_ris_opt)
-        ris_layout.addWidget(self.combo_ris_pol)
-        ris_layout.addWidget(QLabel("UDP:"))
-        ris_layout.addWidget(self.edit_ris_ip)
-        ris_layout.addWidget(self.spin_ris_port)
         ris_layout.addWidget(self.btn_apply_ris)
-        ris_layout.addWidget(self.chk_auto_ris)
         ris_layout.addWidget(self.btn_ris_zero)
         ris_layout.addWidget(self.btn_ris_one)
         ris_layout.addWidget(self.btn_ris_on)
@@ -823,19 +796,19 @@ class VNARealtimeWindow(QMainWindow):
     # LÓGICA DE CONTROL DE LA RIS POR COORDENADAS
     # =========================================================================
     def _on_ris_coord_spin_changed(self):
-        if self.chk_auto_ris.isChecked():
-            self.apply_ris_from_ui()
+        """Aplica automáticamente el cambio de configuración en la RIS al modificar cualquier coordenada."""
+        self.apply_ris_from_ui()
 
     def apply_ris_from_ui(self):
         """Toma las coordenadas RX y TX de la interfaz, genera el RISConfig y lo aplica con RISServerController."""
         rx_pos = [self.spin_rx_x.value(), self.spin_rx_y.value(), self.spin_rx_z.value()]
         tx_pos = [self.spin_tx_x.value(), self.spin_tx_y.value(), self.spin_tx_z.value()]
         freq_hz = self.spin_ris_freq.value() * 1e9
-        boresight = self.combo_boresight.currentData()
-        optimizer = self.combo_ris_opt.currentData()
-        pol_mode = self.combo_ris_pol.currentData()
-        ip = self.edit_ris_ip.text().strip() or "127.0.0.1"
-        port = self.spin_ris_port.value()
+        boresight = "y"  # Eje perpendicular fijado a 'y'
+        optimizer = self.combo_ris_opt.currentData() if hasattr(self, "combo_ris_opt") else "1d_search"
+        pol_mode = "vh"  # Ambas polarizaciones con la misma configuración
+        ip = RIS_IP
+        port = RIS_PORT
 
         try:
             # 1. Calculamos las matrices 40x40 de estados según las coordenadas RX/TX
@@ -861,7 +834,7 @@ class VNARealtimeWindow(QMainWindow):
 
             self.last_ris_info = info
             msg = (
-                f"✅ RIS ({info['boresight'].upper()}) -> RX=({rx_pos[0]:+.2f}, {rx_pos[1]:+.2f}, {rx_pos[2]:+.2f}) m | "
+                f"✅ RX=({rx_pos[0]:+.2f}, {rx_pos[1]:.2f}, {rx_pos[2]:+.2f}) m | "
                 f"Prx est: {info['p_rx_dbm']:.1f} dBm | {info['latencia_ms']:.1f} ms"
             )
             self.lbl_ris_status.setText(msg)
@@ -875,8 +848,8 @@ class VNARealtimeWindow(QMainWindow):
             self.statusBar().showMessage(f"Error al enviar configuración a la RIS: {e}")
 
     def apply_uniform_ris(self, state_bit: int):
-        ip = self.edit_ris_ip.text().strip() or "127.0.0.1"
-        port = self.spin_ris_port.value()
+        ip = RIS_IP
+        port = RIS_PORT
         try:
             bit = 1 if int(state_bit) != 0 else 0
             mat_40x40 = np.full((40, 40), bit, dtype=int)
@@ -903,8 +876,8 @@ class VNARealtimeWindow(QMainWindow):
             self.lbl_ris_status.setStyleSheet("color: #d9534f; font-weight: bold; margin-left: 4px;")
 
     def turn_on_ris(self):
-        ip = self.edit_ris_ip.text().strip() or "127.0.0.1"
-        port = self.spin_ris_port.value()
+        ip = RIS_IP
+        port = RIS_PORT
         try:
             self.ris_server.addr = (ip, port)
             self.ris_server.connect()
@@ -916,8 +889,8 @@ class VNARealtimeWindow(QMainWindow):
             self.lbl_ris_status.setText(f"❌ Error RIS: {e}")
 
     def turn_off_ris(self):
-        ip = self.edit_ris_ip.text().strip() or "127.0.0.1"
-        port = self.spin_ris_port.value()
+        ip = RIS_IP
+        port = RIS_PORT
         try:
             self.ris_server.addr = (ip, port)
             self.ris_server.disconnect()
