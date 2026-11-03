@@ -451,30 +451,26 @@ class RISCoordinateController:
                 mse = np.maximum(1.0 - np.real(u.conj() * rx_sig), 1e-12)
                 rho = pesos / mse
 
-                U = np.zeros((N, N), dtype=complex)
-                v = np.zeros(N, dtype=complex)
-                for k in range(K):
-                    a_k = A[:, k]
-                    U += rho[k] * (np.abs(u[k]) ** 2) * self.p_tx_w * np.outer(a_k, a_k.conj())
-                    v += rho[k] * (u[k].conj() * np.sqrt(self.p_tx_w)) * a_k
+                w_u = rho * (np.abs(u) ** 2) * self.p_tx_w
+                B = A * np.sqrt(w_u)[None, :]  # (N, K): U = B @ B^H
+                v = A @ (rho * u.conj() * np.sqrt(self.p_tx_w))
 
-                U = 0.5 * (U + U.conj().T)
-                lambda_max = float(np.max(np.linalg.eigvalsh(U)))
+                gram_k = B.conj().T @ B  # (K, K)
+                gram_k = 0.5 * (gram_k + gram_k.conj().T)
+                lambda_max = float(np.max(np.linalg.eigvalsh(gram_k)))
                 for _ in range(25):
-                    z = (lambda_max * theta - U @ theta) + v
+                    u_theta = B @ (B.conj().T @ theta)
+                    z = (lambda_max * theta - u_theta) + v
                     theta = np.exp(1j * np.angle(z))
 
             fases_opt_cont = np.mod(np.angle(theta), 2.0 * np.pi)
+            fases_q_rad, estados_int = self._quantize_phases(fases_opt_cont)
+            estados_2d = estados_int.reshape((self.ris_ny, self.ris_nx))
+            fases_q_2d = fases_q_rad.reshape((self.ris_ny, self.ris_nx))
             if _HAS_SURPRISE and self.ris_obj is not None:
-                self.ris_obj.set_all_shift(fases_opt_cont.reshape((self.ris_ny, self.ris_nx)), mode="disc")
+                self.ris_obj.set_all_shift(fases_q_2d, mode="disc")
                 estados_2d = self.ris_obj.get_all_state_indices().astype(int)
-                fases_q_2d = self.ris_obj.elem_phase_shift.copy()
-                theta_q = np.exp(1j * fases_q_2d.reshape(-1))
-            else:
-                fases_q_rad, estados_int = self._quantize_phases(fases_opt_cont)
-                estados_2d = estados_int.reshape((self.ris_ny, self.ris_nx))
-                fases_q_2d = fases_q_rad.reshape((self.ris_ny, self.ris_nx))
-                theta_q = np.exp(1j * fases_q_rad)
+            theta_q = np.exp(1j * fases_q_2d.reshape(-1))
 
             h_eff_vec = np.array([np.vdot(A[:, k], theta_q) for k in range(K)])
             p_rx_w = float(np.mean(self.p_tx_w * (np.abs(h_eff_vec) ** 2)))
