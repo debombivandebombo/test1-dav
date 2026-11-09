@@ -231,6 +231,7 @@ class VNARealtimeWindow(QMainWindow):
             polarization_mode="vh",
         )
         self.last_ris_info = None
+        self.laya_inferencer = None
 
         self._build_ui()
 
@@ -495,7 +496,16 @@ class VNARealtimeWindow(QMainWindow):
         self.btn_apply_ris.setStyleSheet(
             "font-weight: bold; background-color: #5cb85c; color: white; border-radius: 4px; padding: 3px 8px;"
         )
+        self.btn_apply_ris.setToolTip("Calcula y envía la configuración con el algoritmo clásico (surpRISe)")
         self.btn_apply_ris.clicked.connect(self.apply_ris_from_ui)
+
+        self.btn_apply_laya = QPushButton("🧠 Apuntar Laya")
+        self.btn_apply_laya.setMinimumHeight(30)
+        self.btn_apply_laya.setStyleSheet(
+            "font-weight: bold; background-color: #7b2cbf; color: white; border-radius: 4px; padding: 3px 8px;"
+        )
+        self.btn_apply_laya.setToolTip("Calcula en milisegundos la matriz 40x40 con Laya y la envía a la RIS")
+        self.btn_apply_laya.clicked.connect(self.apply_laya_ris_from_ui)
 
         self.btn_ris_zero = QPushButton("Todo 0")
         self.btn_ris_zero.setToolTip("Pone state_matrix_v y state_matrix_h de la RIS en estado 0")
@@ -531,6 +541,7 @@ class VNARealtimeWindow(QMainWindow):
         ris_layout.addWidget(self.spin_ris_freq)
         ris_layout.addWidget(self.combo_ris_opt)
         ris_layout.addWidget(self.btn_apply_ris)
+        ris_layout.addWidget(self.btn_apply_laya)
         ris_layout.addWidget(self.btn_ris_zero)
         ris_layout.addWidget(self.btn_ris_one)
         ris_layout.addWidget(self.btn_ris_on)
@@ -838,6 +849,52 @@ class VNARealtimeWindow(QMainWindow):
             )
         except Exception as e:
             self.statusBar().showMessage(f"Error al enviar configuración a la RIS: {e}")
+
+    def apply_laya_ris_from_ui(self):
+        """Toma las mismas coordenadas RX y TX de la interfaz, infiere la matriz 40x40 con Laya y la envía."""
+        rx_pos = [self.spin_rx_x.value(), self.spin_rx_y.value(), self.spin_rx_z.value()]
+        tx_pos = [self.spin_tx_x.value(), self.spin_tx_y.value(), self.spin_tx_z.value()]
+        freq_hz = self.spin_ris_freq.value() * 1e9
+        boresight = "y"
+        pol_mode = "vh"
+        ip = RIS_IP
+        port = RIS_PORT
+
+        try:
+            if self.laya_inferencer is None:
+                self.statusBar().showMessage("Cargando modelo Laya (checkpoint_best.pt)... espere un momento...")
+                QApplication.processEvents()
+                from laya_ris_inference import LayaRISInferencer
+                self.laya_inferencer = LayaRISInferencer()
+
+            info = self.laya_inferencer.compute_states_for_coordinates(
+                rx_coords=rx_pos,
+                tx_pos=tx_pos,
+                freq_hz=freq_hz,
+                boresight=boresight,
+                polarization_mode=pol_mode,
+            )
+
+            config = RISConfig(
+                state_matrix_v=info["estados_40x40"],
+                state_matrix_h=info["estados_h_40x40"],
+            )
+            self.ris_server.addr = (ip, port)
+            if not self.ris_connected:
+                self.ris_server.connect()
+                self.ris_connected = True
+            self.ris_server.apply_config(config)
+
+            self.last_ris_info = info
+            msg = (
+                f"[LAYA] RX=({rx_pos[0]:+.2f}, {rx_pos[1]:.2f}, {rx_pos[2]:+.2f}) m | "
+                f"Inferencia: {info['latencia_ms']:.1f} ms"
+            )
+            self.statusBar().showMessage(
+                f"RISConfig de Laya aplicado mediante RISServerController en {ip}:{port} -> {msg}"
+            )
+        except Exception as e:
+            self.statusBar().showMessage(f"Error al enviar configuración de Laya a la RIS: {e}")
 
     def apply_uniform_ris(self, state_bit: int):
         ip = RIS_IP
