@@ -25,7 +25,7 @@ WORKSPACE_ROOT = Path(__file__).resolve().parent.parent
 AGENTIC_RIS_SRC = WORKSPACE_ROOT / "agentic-ris" / "src"
 AGENTIC_RIS_SITE = WORKSPACE_ROOT / "agentic-ris" / ".venv" / "Lib" / "site-packages"
 SURPRISE_SRC = WORKSPACE_ROOT / "surpRISe" / "src"
-DEFAULT_EXP_DIR = WORKSPACE_ROOT / "laya_ris_experiments"
+DEFAULT_EXP_DIR = WORKSPACE_ROOT / "agentic-ris" / "laya_ris_experiments" / "laya_v5"
 
 for p in (AGENTIC_RIS_SRC, SURPRISE_SRC, AGENTIC_RIS_SITE):
     if p.exists() and str(p) not in sys.path:
@@ -72,11 +72,14 @@ class LayaRISInferencer:
             self.cfg = yaml.safe_load(f)
 
         # Ajuste de ruta de checkpoint lector local
-        local_reader = self.exp_dir / "reader" / "reader.pt"
-        if local_reader.exists():
-            self.cfg["laya_backbone"]["init_from"] = str(local_reader)
-        else:
-            self.cfg["laya_backbone"]["init_from"] = None
+        reader_candidates = [
+            self.exp_dir / "reader" / "reader.pt",
+            self.exp_dir.parent / "reader" / "reader.pt",
+            WORKSPACE_ROOT / "agentic-ris" / "laya_ris_experiments" / "reader" / "reader.pt",
+            WORKSPACE_ROOT / "agentic-ris" / "artifacts" / "laya_reader" / "reader.pt",
+        ]
+        local_reader = next((p for p in reader_candidates if p.exists()), None)
+        self.cfg["laya_backbone"]["init_from"] = str(local_reader) if local_reader is not None else None
 
         # Usar snapshot local de HuggingFace si existe para inferencia 100% offline
         snapshot_dir = (
@@ -108,7 +111,10 @@ class LayaRISInferencer:
 
         ckpt = torch.load(ckpt_path, map_location=self.device, weights_only=False)
         self.controller.load_checkpoint_state(ckpt["state"])
-        self.controller.eval()
+        if hasattr(self.controller, "prepare_for_fast_inference"):
+            self.controller.prepare_for_fast_inference()
+        else:
+            self.controller.eval()
 
         self.formatter = TextFormatter({
             "template_version": "v1",
@@ -250,7 +256,7 @@ class LayaRISInferencer:
             freq_hz=freq_hz,
         )
 
-        with torch.no_grad():
+        with torch.inference_mode():
             mask_flat = self.controller.act([item], rule="mean")[0].cpu().numpy().astype(int)
 
         estados_2d = mask_flat.reshape(self.ris_schema_cfg.nrow, self.ris_schema_cfg.ncol)
@@ -277,7 +283,7 @@ class LayaRISInferencer:
             "tx_pos": tx_pos,
             "freq_hz": freq_hz,
             "boresight": boresight,
-            "optimizer": "laya_residual_phasor",
+            "optimizer": "laya_v5_residual_phasor",
             "polarization_mode": pol,
             "ris_config": ris_config,
             "estados_40x40": mat_v,

@@ -432,7 +432,6 @@ class VNARealtimeWindow(QMainWindow):
         self.spin_rx_x.setSingleStep(0.05)
         self.spin_rx_x.setValue(-0.500)
         self.spin_rx_x.setSuffix(" m")
-        self.spin_rx_x.valueChanged.connect(self._on_ris_coord_spin_changed)
 
         self.spin_rx_y = QDoubleSpinBox()
         self.spin_rx_y.setDecimals(3)
@@ -440,7 +439,6 @@ class VNARealtimeWindow(QMainWindow):
         self.spin_rx_y.setSingleStep(0.05)
         self.spin_rx_y.setValue(1.400)
         self.spin_rx_y.setSuffix(" m")
-        self.spin_rx_y.valueChanged.connect(self._on_ris_coord_spin_changed)
 
         self.spin_rx_z = QDoubleSpinBox()
         self.spin_rx_z.setDecimals(3)
@@ -448,7 +446,6 @@ class VNARealtimeWindow(QMainWindow):
         self.spin_rx_z.setSingleStep(0.05)
         self.spin_rx_z.setValue(0.000)
         self.spin_rx_z.setSuffix(" m")
-        self.spin_rx_z.valueChanged.connect(self._on_ris_coord_spin_changed)
 
         # Coordenadas TX [x, y, z] y Frecuencia RIS
         self.spin_tx_x = QDoubleSpinBox()
@@ -457,7 +454,6 @@ class VNARealtimeWindow(QMainWindow):
         self.spin_tx_x.setSingleStep(0.1)
         self.spin_tx_x.setValue(0.00)
         self.spin_tx_x.setSuffix(" m")
-        self.spin_tx_x.valueChanged.connect(self._on_ris_coord_spin_changed)
 
         self.spin_tx_y = QDoubleSpinBox()
         self.spin_tx_y.setDecimals(2)
@@ -465,7 +461,6 @@ class VNARealtimeWindow(QMainWindow):
         self.spin_tx_y.setSingleStep(0.1)
         self.spin_tx_y.setValue(1.10)
         self.spin_tx_y.setSuffix(" m")
-        self.spin_tx_y.valueChanged.connect(self._on_ris_coord_spin_changed)
 
         self.spin_tx_z = QDoubleSpinBox()
         self.spin_tx_z.setDecimals(2)
@@ -473,7 +468,6 @@ class VNARealtimeWindow(QMainWindow):
         self.spin_tx_z.setSingleStep(0.1)
         self.spin_tx_z.setValue(0.00)
         self.spin_tx_z.setSuffix(" m")
-        self.spin_tx_z.valueChanged.connect(self._on_ris_coord_spin_changed)
 
         self.spin_ris_freq = QDoubleSpinBox()
         self.spin_ris_freq.setDecimals(2)
@@ -481,7 +475,6 @@ class VNARealtimeWindow(QMainWindow):
         self.spin_ris_freq.setValue(28.00)
         self.spin_ris_freq.setSingleStep(0.5)
         self.spin_ris_freq.setSuffix(" GHz")
-        self.spin_ris_freq.valueChanged.connect(self._on_ris_coord_spin_changed)
 
         self.combo_ris_opt = QComboBox()
         self.combo_ris_opt.addItem("Opt: 1D Search", "1d_search")
@@ -489,9 +482,8 @@ class VNARealtimeWindow(QMainWindow):
         self.combo_ris_opt.addItem("Opt: Direct Disc", "direct_disc")
         self.combo_ris_opt.addItem("Opt: Chen Alg1", "chen_alg1")
         self.combo_ris_opt.setToolTip("Algoritmo de optimización discreta de surpRISe")
-        self.combo_ris_opt.currentIndexChanged.connect(self._on_ris_coord_spin_changed)
 
-        self.btn_apply_ris = QPushButton("📡 Apuntar RIS")
+        self.btn_apply_ris = QPushButton("Conf")
         self.btn_apply_ris.setMinimumHeight(30)
         self.btn_apply_ris.setStyleSheet(
             "font-weight: bold; background-color: #5cb85c; color: white; border-radius: 4px; padding: 3px 8px;"
@@ -499,12 +491,12 @@ class VNARealtimeWindow(QMainWindow):
         self.btn_apply_ris.setToolTip("Calcula y envía la configuración con el algoritmo clásico (surpRISe)")
         self.btn_apply_ris.clicked.connect(self.apply_ris_from_ui)
 
-        self.btn_apply_laya = QPushButton("🧠 Apuntar Laya")
+        self.btn_apply_laya = QPushButton("Laya")
         self.btn_apply_laya.setMinimumHeight(30)
         self.btn_apply_laya.setStyleSheet(
             "font-weight: bold; background-color: #7b2cbf; color: white; border-radius: 4px; padding: 3px 8px;"
         )
-        self.btn_apply_laya.setToolTip("Calcula en milisegundos la matriz 40x40 con Laya y la envía a la RIS")
+        self.btn_apply_laya.setToolTip("Calcula en milisegundos la matriz 40x40 con Laya v5 y la envía a la RIS")
         self.btn_apply_laya.clicked.connect(self.apply_laya_ris_from_ui)
 
         self.btn_ris_zero = QPushButton("Todo 0")
@@ -802,10 +794,6 @@ class VNARealtimeWindow(QMainWindow):
     # =========================================================================
     # LÓGICA DE CONTROL DE LA RIS POR COORDENADAS
     # =========================================================================
-    def _on_ris_coord_spin_changed(self):
-        """Aplica automáticamente el cambio de configuración en la RIS al modificar cualquier coordenada."""
-        self.apply_ris_from_ui()
-
     def apply_ris_from_ui(self):
         """Toma las coordenadas RX y TX de la interfaz, genera el RISConfig y lo aplica con RISServerController."""
         rx_pos = [self.spin_rx_x.value(), self.spin_rx_y.value(), self.spin_rx_z.value()]
@@ -862,7 +850,7 @@ class VNARealtimeWindow(QMainWindow):
 
         try:
             if self.laya_inferencer is None:
-                self.statusBar().showMessage("Cargando modelo Laya (checkpoint_best.pt)... espere un momento...")
+                self.statusBar().showMessage("Cargando modelo Laya v5 (checkpoint_best.pt)... espere un momento...")
                 QApplication.processEvents()
                 from laya_ris_inference import LayaRISInferencer
                 self.laya_inferencer = LayaRISInferencer()
@@ -887,7 +875,7 @@ class VNARealtimeWindow(QMainWindow):
 
             self.last_ris_info = info
             msg = (
-                f"[LAYA] RX=({rx_pos[0]:+.2f}, {rx_pos[1]:.2f}, {rx_pos[2]:+.2f}) m | "
+                f"[LAYA v5] RX=({rx_pos[0]:+.2f}, {rx_pos[1]:.2f}, {rx_pos[2]:+.2f}) m | "
                 f"Inferencia: {info['latencia_ms']:.1f} ms"
             )
             self.statusBar().showMessage(
